@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>NaviGO</title>
+    <!-- PWA: instalar na tela inicial (manifest) e ícone/cores no iPhone. -->
+    <link rel="manifest" href="/navigo/app/manifest.webmanifest" />
+    <meta name="theme-color" content="#208AEF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="NaviGO" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="apple-touch-icon" href="/navigo/app/icons/apple-touch-icon.png" />
+    <!-- Service worker (public/sw.js): abre sem internet e acrescenta COOP/COEP, que o banco local
+         (expo-sqlite wasm) exige e o GitHub Pages não define. Na primeira visita a página recarrega
+         uma vez, quando ele assume. Versão nova só entra quando o usuário toca no aviso do app
+         (src/web/service-worker.ts); aí ele assume e a página recarrega. -->
+    <script id="navigo-sw">
+      (function () {
+        var sw = navigator.serviceWorker;
+        if (!sw || !window.isSecureContext) return;
+        if (sw.controller) {
+          // Safari e outros sem `window.chrome`: COEP credentialless, como no coi-serviceworker.
+          sw.controller.postMessage({
+            type: 'coepCredentialless',
+            value: !(window.chrome || window.netscape),
+          });
+        }
+        var reloading = false;
+        sw.addEventListener('controllerchange', function () {
+          if (reloading) return;
+          reloading = true;
+          location.reload();
+        });
+        sw.register('/navigo/app/sw.js').then(function (reg) {
+          // Ativo, mas a página abriu sem ele (recarga forçada): recarrega para ficar isolada.
+          if (reg.active && !sw.controller && window.crossOriginIsolated === false) {
+            location.reload();
+          }
+        });
+      })();
+    </script>
+    <!-- Volta do login Google (src/services/google-auth.web.ts): guarda a resposta na aba e tira o
+         token do endereço antes de o app ler a URL, voltando à tela onde o usuário estava. -->
+    <script id="navigo-google-return">
+      (function () {
+        var hash = location.hash;
+        if (!/[#&](access_token|error)=/.test(hash) || !/[#&]state=/.test(hash)) return;
+        var to = null;
+        try {
+          sessionStorage.setItem('navigo.google.return', hash);
+          to = sessionStorage.getItem('navigo.google.returnTo');
+          sessionStorage.removeItem('navigo.google.returnTo');
+        } catch (e) {
+          // sem armazenamento: o login não se completa e o app segue desconectado
+        }
+        history.replaceState(null, '', to || location.pathname + location.search);
+      })();
+    </script>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+  <link rel="icon" href="/navigo/app/favicon.ico"/><link rel="preload" href="/navigo/app/_expo/static/css/maplibre-gl-dc3f9f1339c2c312db0e4c8f314a98f9.css" as="style">
+<link rel="stylesheet" href="/navigo/app/_expo/static/css/maplibre-gl-dc3f9f1339c2c312db0e4c8f314a98f9.css"></head>
+
+  <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root"></div>
+  <script src="/navigo/app/_expo/static/js/web/__expo-metro-runtime-97703ae02682710149335928b974f18d.js" defer></script><script src="/navigo/app/_expo/static/js/web/__common-fd9306d8645ba482512820d3a5bf70ab.js" defer></script><script src="/navigo/app/_expo/static/js/web/entry-e14a8fd3e32697ad68ace3da5ae9ad3c.js" defer></script>
+</body>
+</html>
