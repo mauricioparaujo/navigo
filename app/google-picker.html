@@ -53,14 +53,20 @@
           callback: function () {
             var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
               .setMimeTypes('application/json')
-              .setQuery('navigo-viagem')
               .setMode(google.picker.DocsViewMode.LIST);
+            // Convite: só o arquivo da viagem convidada.
+            if (CFG.fileId && view.setFileIds) view.setFileIds(CFG.fileId);
+            else view.setQuery('navigo-viagem');
             new google.picker.PickerBuilder()
               .setOAuthToken(CFG.token)
               .setDeveloperKey(CFG.apiKey)
               .setAppId(CFG.appId)
               .setLocale('pt-BR')
-              .setTitle('Escolha a viagem compartilhada')
+              .setTitle(
+                CFG.fileId
+                  ? 'Toque na viagem e em Selecionar para aceitar'
+                  : 'Escolha a viagem compartilhada',
+              )
               .addView(view)
               .setCallback(function (d) {
                 if (d.action === google.picker.Action.PICKED && d.docs && d.docs[0]) {
