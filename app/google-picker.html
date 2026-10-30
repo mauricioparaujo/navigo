@@ -1,0 +1,94 @@
+<!doctype html>
+<!--
+  NaviGO (web): seletor do Google (Google Picker) para abrir uma viagem compartilhada.
+  Fica fora do isolamento entre origens do resto do site (sem coi-serviceworker; ver
+  src/services/picker-page.ts, metro.config.js e public/coi-serviceworker.js), porque o Picker é
+  uma moldura do Google. Mesmo seletor do app (src/services/drive-picker.ts, pickerHtml).
+  Pedido e resposta passam pelo sessionStorage da aba; o token nunca vai para a URL.
+-->
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>NaviGO · Google Drive</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font-family: system-ui, sans-serif;
+      }
+      p {
+        padding: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Abrindo o Google Drive…</p>
+    <script>
+      var REQUEST = 'navigo.picker.request';
+      var RESULT = 'navigo.picker.result';
+      var CFG = null;
+      try {
+        CFG = JSON.parse(sessionStorage.getItem(REQUEST) || 'null');
+        sessionStorage.removeItem(REQUEST);
+      } catch (e) {
+        CFG = null;
+      }
+      var done = false;
+      function send(m) {
+        if (done) return;
+        done = true;
+        try {
+          sessionStorage.setItem(RESULT, JSON.stringify(m));
+        } catch (e) {
+          // sem armazenamento: o app trata a falta de resposta como nada escolhido
+        }
+        location.replace(CFG && CFG.returnTo ? CFG.returnTo : './');
+      }
+      function start() {
+        if (!CFG || !CFG.token || !CFG.apiKey || !CFG.appId) return send({ type: 'error' });
+        gapi.load('picker', {
+          callback: function () {
+            var view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+              .setMimeTypes('application/json')
+              .setMode(google.picker.DocsViewMode.LIST);
+            // Convite: só o arquivo da viagem convidada.
+            if (CFG.fileId && view.setFileIds) view.setFileIds(CFG.fileId);
+            else view.setQuery('navigo-viagem');
+            new google.picker.PickerBuilder()
+              .setOAuthToken(CFG.token)
+              .setDeveloperKey(CFG.apiKey)
+              .setAppId(CFG.appId)
+              .setLocale('pt-BR')
+              .setTitle(
+                CFG.fileId
+                  ? 'Toque na viagem e em Selecionar para aceitar'
+                  : 'Escolha a viagem compartilhada',
+              )
+              .addView(view)
+              .setCallback(function (d) {
+                if (d.action === google.picker.Action.PICKED && d.docs && d.docs[0]) {
+                  send({ type: 'picked', id: d.docs[0].id, name: d.docs[0].name });
+                } else if (d.action === google.picker.Action.CANCEL) {
+                  send({ type: 'cancel' });
+                }
+              })
+              .build()
+              .setVisible(true);
+          },
+          onerror: function () {
+            send({ type: 'error' });
+          },
+        });
+      }
+      if (!CFG) send({ type: 'error' });
+    </script>
+    <script
+      src="https://apis.google.com/js/api.js"
+      onload="start()"
+      onerror="send({ type: 'error' })"
+    ></script>
+  </body>
+</html>
